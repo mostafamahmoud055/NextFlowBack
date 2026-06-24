@@ -1,0 +1,366 @@
+{
+	"info": {
+		"_postman_id": "nextflow-auth-collection",
+		"name": "NextFlow - Auth API",
+		"description": "Session-based Sanctum authentication for the NextFlow Laravel API.\n\n## How to use\n1. Import this collection and `NextFlow-Local.postman_environment.json`.\n2. Select the **NextFlow Local** environment.\n3. Run **1. Get CSRF Cookie** first (or run requests in order — POST requests auto-refresh CSRF).\n4. Use **Register** or **Login**, then **Me** and **Logout**.\n\n## Notes\n- Uses session cookies (not bearer tokens).\n- `Origin` / `Referer` must match `SANCTUM_STATEFUL_DOMAINS` in `.env`.\n- Use `localhost` for the API URL (not `127.0.0.1`) when `SESSION_DOMAIN=localhost`.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"const methodsNeedingCsrf = ['POST', 'PUT', 'PATCH', 'DELETE'];",
+					"",
+					"if (!methodsNeedingCsrf.includes(pm.request.method)) {",
+					"    return;",
+					"}",
+					"",
+					"const requestName = pm.info.requestName;",
+					"const baseUrl = pm.collectionVariables.get('base_url');",
+					"const origin = pm.collectionVariables.get('origin');",
+					"",
+					"function syncCsrfToken() {",
+					"    const xsrf = pm.cookies.get('XSRF-TOKEN');",
+					"    if (xsrf) {",
+					"        pm.collectionVariables.set('xsrf_token', decodeURIComponent(xsrf));",
+					"    }",
+					"}",
+					"",
+					"if (requestName === '5. Logout') {",
+					"    syncCsrfToken();",
+					"    return;",
+					"}",
+					"",
+					"if (!pm.cookies.get('XSRF-TOKEN')) {",
+					"    await pm.sendRequest({",
+					"        url: `${baseUrl}/sanctum/csrf-cookie`,",
+					"        method: 'GET',",
+					"        header: {",
+					"            Origin: origin,",
+					"            Referer: `${origin}/`,",
+					"            Accept: 'application/json',",
+					"        },",
+					"    });",
+					"}",
+					"",
+					"syncCsrfToken();"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000"
+		},
+		{
+			"key": "origin",
+			"value": "http://localhost:3000"
+		},
+		{
+			"key": "xsrf_token",
+			"value": ""
+		},
+		{
+			"key": "name",
+			"value": "Test User"
+		},
+		{
+			"key": "email",
+			"value": "test@example.com"
+		},
+		{
+			"key": "password",
+			"value": "password123"
+		}
+	],
+	"item": [
+		{
+			"name": "1. Get CSRF Cookie",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test('Status is 204', function () {",
+							"    pm.response.to.have.status(204);",
+							"});",
+							"",
+							"const xsrf = pm.cookies.get('XSRF-TOKEN');",
+							"pm.test('XSRF-TOKEN cookie is set', function () {",
+							"    pm.expect(xsrf).to.not.be.undefined;",
+							"});",
+							"",
+							"if (xsrf) {",
+							"    pm.collectionVariables.set('xsrf_token', decodeURIComponent(xsrf));",
+							"}"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					},
+					{
+						"key": "Origin",
+						"value": "{{origin}}"
+					},
+					{
+						"key": "Referer",
+						"value": "{{origin}}/"
+					}
+				],
+				"url": "{{base_url}}/sanctum/csrf-cookie",
+				"description": "Fetches the CSRF cookie required before register/login/logout.\n\nPostman stores `XSRF-TOKEN` and `laravel-session` cookies automatically."
+			},
+			"response": []
+		},
+		{
+			"name": "2. Register",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test('Status is 201', function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"",
+							"const json = pm.response.json();",
+							"",
+							"pm.test('Response status is success', function () {",
+							"    pm.expect(json.status).to.eql('success');",
+							"});",
+							"",
+							"pm.test('User data is returned', function () {",
+							"    pm.expect(json.data).to.have.property('id');",
+							"    pm.expect(json.data).to.have.property('email');",
+							"});",
+							"",
+							"if (json.data && json.data.email) {",
+							"    pm.collectionVariables.set('email', json.data.email);",
+							"}",
+							"",
+							"const xsrf = pm.cookies.get('XSRF-TOKEN');",
+							"if (xsrf) {",
+							"    pm.collectionVariables.set('xsrf_token', decodeURIComponent(xsrf));",
+							"}"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Origin",
+						"value": "{{origin}}"
+					},
+					{
+						"key": "Referer",
+						"value": "{{origin}}/"
+					},
+					{
+						"key": "X-XSRF-TOKEN",
+						"value": "{{xsrf_token}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"name\": \"{{name}}\",\n    \"email\": \"{{email}}\",\n    \"password\": \"{{password}}\",\n    \"password_confirmation\": \"{{password}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "{{base_url}}/api/register",
+				"description": "Creates a new user and logs them in via session."
+			},
+			"response": []
+		},
+		{
+			"name": "3. Login",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test('Status is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const json = pm.response.json();",
+							"",
+							"pm.test('Response status is success', function () {",
+							"    pm.expect(json.status).to.eql('success');",
+							"});",
+							"",
+							"pm.test('User data is returned', function () {",
+							"    pm.expect(json.data).to.have.property('id');",
+							"    pm.expect(json.data.email).to.eql(pm.collectionVariables.get('email'));",
+							"});",
+							"",
+							"const xsrf = pm.cookies.get('XSRF-TOKEN');",
+							"if (xsrf) {",
+							"    pm.collectionVariables.set('xsrf_token', decodeURIComponent(xsrf));",
+							"}"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Origin",
+						"value": "{{origin}}"
+					},
+					{
+						"key": "Referer",
+						"value": "{{origin}}/"
+					},
+					{
+						"key": "X-XSRF-TOKEN",
+						"value": "{{xsrf_token}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"email\": \"{{email}}\",\n    \"password\": \"{{password}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "{{base_url}}/api/login",
+				"description": "Authenticates an existing user via session."
+			},
+			"response": []
+		},
+		{
+			"name": "4. Me",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test('Status is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const json = pm.response.json();",
+							"",
+							"pm.test('Response status is success', function () {",
+							"    pm.expect(json.status).to.eql('success');",
+							"});",
+							"",
+							"pm.test('Authenticated user is returned', function () {",
+							"    pm.expect(json.data).to.have.property('id');",
+							"    pm.expect(json.data).to.have.property('name');",
+							"    pm.expect(json.data).to.have.property('email');",
+							"});"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					},
+					{
+						"key": "Origin",
+						"value": "{{origin}}"
+					},
+					{
+						"key": "Referer",
+						"value": "{{origin}}/"
+					}
+				],
+				"url": "{{base_url}}/api/me",
+				"description": "Returns the currently authenticated user. Requires an active session."
+			},
+			"response": []
+		},
+		{
+			"name": "5. Logout",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test('Status is 200', function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const json = pm.response.json();",
+							"",
+							"pm.test('Response status is success', function () {",
+							"    pm.expect(json.status).to.eql('success');",
+							"});",
+							"",
+							"pm.test('Logout message is returned', function () {",
+							"    pm.expect(json.message).to.include('Logged out');",
+							"});"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					},
+					{
+						"key": "Origin",
+						"value": "{{origin}}"
+					},
+					{
+						"key": "Referer",
+						"value": "{{origin}}/"
+					},
+					{
+						"key": "X-XSRF-TOKEN",
+						"value": "{{xsrf_token}}"
+					}
+				],
+				"url": "{{base_url}}/api/logout",
+				"description": "Destroys the current session."
+			},
+			"response": []
+		}
+	]
+}
