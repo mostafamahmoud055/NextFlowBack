@@ -43,7 +43,6 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
-          script_stop: true
           script: |
             set -e
             cd /var/www/NextFlowBack
