@@ -23,7 +23,6 @@ class SocialAuthController extends Controller
 
         try {
             $googleUser = Socialite::driver('google')->stateless()->user();
-            
         } catch (Throwable) {
             return redirect("{$frontendUrl}/auth/google/callback?error=google_auth_failed");
         }
